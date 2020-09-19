@@ -1,2 +1,2 @@
-# pynflfastr
-python library for analyzing nflfastR play-by-play data
+# pydfs-lineup-utilities
+Companion library to pydfs-lineup-optimizer
