@@ -1,22 +1,62 @@
 # dkscraper.py
 
+import datetime
 import logging
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 
+DATA_DIR = Path(__file__).parent / 'data'
 OFFENSE_PLAY_TYPES = ('pass', 'run', 'qb_spike', 'qb_kneel')
 OFFENSE_IMPORTANT_PLAYS = ('pass', 'run')
 
 
 def convert_top(t):
-    """Converts time of possession to integer"""
+    """Converts time of possession string to seconds
+    
+    Args:
+        t (str): e.g. '1:30'
+
+    Returns:
+        int: e.g. 90
+    """
     try:
         m, s = [int(c) for c in t.split(':')]
         return m * 60 + s
     except (AttributeError, ValueError):
         return 0
+
+
+def current_season():
+    """Gets current season year
+
+    Returns:
+        int: e.g. 2020
+    """
+    td = datetime.datetime.today()
+    if td.month > 8:
+        return td.year
+    return td.year - 1
+
+
+def current_season_week(sched=None):
+    """Gets current week of current season
+    
+    Args:
+        sched (DataFrame): default None
+
+    Returns:
+        int: 1 - 17
+    """
+    if sched is None or sched.empty:
+        sched = schedule()
+    td = datetime.datetime.today()
+    seas = current_season()
+    week_starts = sched.loc[sched.season == seas, :].groupby('week')['gameday'].min()
+    this_week = week_starts.loc[week_starts < td].max()
+    return week_starts.loc[week_starts == this_week].index.values[0]
 
 
 def dst(df):
@@ -30,6 +70,17 @@ def dst(df):
 
     """
     pass
+
+
+def gamesmeta(sched=None):
+    """Converts schedule to one row per team, two per game"""
+    if sched is None or sched.empty:
+        sched = schedule()
+    h = sched.copy()
+    a = sched.copy()
+    h = h.rename(columns={'home_team': 'team', 'away_team': 'opp'})
+    a = a.rename(columns={'away_team': 'team', 'home_team': 'opp'})
+    return pd.concat([a, h]).sort_values('game_id')
 
 
 def passing(df):
@@ -172,6 +223,13 @@ def rushing_success_rate(df):
         .assign(success_rate=lambda df_: df_.successes / df_.rushes)
         .droplevel(0)
     )
+
+
+def schedule(fn=None):
+    """Gets schedule"""
+    if not fn:
+        fn = DATA_DIR / 'schedule.parquet'
+    return pd.read_parquet(fn)
 
 
 def situation(df):
